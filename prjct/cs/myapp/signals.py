@@ -74,7 +74,8 @@ def process_imported_rapport(sender, instance, created, **kwargs):
                     description="description",
                     dateDebut=date_rapport,
                     dateFin=date_rapport + timedelta(days=70),
-                    dureePrevistionnelle=70,
+                    coutActuel=+cout_actuel,
+                    durationActuelle=+1,
                 )
             
             # Create Rapport

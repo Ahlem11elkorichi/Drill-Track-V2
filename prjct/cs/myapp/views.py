@@ -39,8 +39,286 @@ from .permissions import IsResponsable, IsIngenieurTerrain
 #             return Response(serializer.data, status=status.HTTP_201_CREATED)
 #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+from rest_framework.decorators import api_view
+
+from .models import Phase, Forage
+from django.db.models import Max
+class ForageCostStatusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id_forage, format=None):
+        try:
+            forage = Forage.objects.get(idForage=id_forage)
+
+            cout_prev = forage.coutprevistionnel
+            cout_actuel = forage.coutActuel
+
+            if cout_prev > 0:
+                pourcentage_depassement = ((cout_actuel - cout_prev) / cout_prev) * 100
+            else:
+                pourcentage_depassement = 0
+
+            if pourcentage_depassement <= 10:
+                statut = "green"
+                statut_text = "Acceptable"
+            elif pourcentage_depassement <= 25:
+                statut = "orange"
+                statut_text = "Slight overage"
+            else:
+                statut = "red"
+                statut_text = "Significant overage"
+
+            segment_vert = cout_prev * 1.1
+            segment_orange = cout_prev * 1.25
+            max_value = cout_prev * 1.5
+
+            data = {
+                "cout_previsionnel_forage": cout_prev,
+                "cout_actuel_forage": cout_actuel,
+                "pourcentage_depassement": round(pourcentage_depassement, 2),
+                "statut": statut,
+                "statut_text": statut_text,
+                "segments": {
+                    "max_value": max_value,
+                    "segment_stops": [0, segment_vert, segment_orange, max_value],
+                    "current_value": cout_actuel
+                },
+                "forage_info": {
+                    "id_forage": forage.idForage,
+                    "zone": forage.zone,
+                    "date_debut": forage.dateDebut.strftime('%Y-%m-%d') if forage.dateDebut else None,
+                    "date_fin": forage.dateFin.strftime('%Y-%m-%d') if forage.dateFin else None
+                }
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Forage.DoesNotExist:
+            return Response(
+                {"error": "Forage non trouvé."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print("Erreur serveur forage cost status:", str(e))
+            return Response(
+                {"error": "Une erreur interne est survenue"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+class PhaseDelayStatusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id_forage, format=None):
+        try:
+            latest_phase = Phase.objects.filter(idForage=id_forage).order_by('-dateDebut').first()
+            if not latest_phase:
+                return Response({"error": "Aucune phase trouvée pour ce forage."}, status=status.HTTP_404_NOT_FOUND)
+
+            phase_standard = latest_phase.idPhaseStandard
+            if not phase_standard:
+                return Response({"error": "Aucune phase standard associée à cette phase."}, status=status.HTTP_404_NOT_FOUND)
+
+            delai_previsionnel = phase_standard.delaiPrevistionel
+            delai_actuel = latest_phase.delaiActuel
+
+            if delai_previsionnel > 0:
+                pourcentage_depassement = ((delai_actuel - delai_previsionnel) / delai_previsionnel) * 100
+            else:
+                pourcentage_depassement = 0
+
+            if pourcentage_depassement <= 10:
+                statut = "green"
+                statut_text = "On time"
+            elif pourcentage_depassement <= 25:
+                statut = "orange"
+                statut_text = "Slight delay"
+            else:
+                statut = "red"
+                statut_text = "Significant delay"
+
+            data = {
+                "delai_previsionnel": delai_previsionnel,
+                "delai_actuel": delai_actuel,
+                "pourcentage_depassement": round(pourcentage_depassement, 2),
+                "statut": statut,
+                "statut_text": statut_text,
+                "phase_info": {
+                    "id_phase": latest_phase.idPhase,
+                    "nom_phase_standard": phase_standard.nomDePhase,
+                    "date_debut": latest_phase.dateDebut.strftime('%Y-%m-%d')
+                }
+            }
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class ForageDelayStatusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id_forage, format=None):
+        try:
+            forage = Forage.objects.get(pk=id_forage)
+
+            duree_previsionnelle = forage.dureePrevistionnelle or 0
+            duree_actuelle = forage.durationActuelle or 0
+
+            if duree_previsionnelle > 0:
+                pourcentage_depassement = ((duree_actuelle - duree_previsionnelle) / duree_previsionnelle) * 100
+            else:
+                pourcentage_depassement = 0
+
+            if pourcentage_depassement <= 10:
+                statut = "green"
+                statut_text = "On time"
+            elif pourcentage_depassement <= 25:
+                statut = "orange"
+                statut_text = "Slight delay"
+            else:
+                statut = "red"
+                statut_text = "Significant delay"
+
+            data = {
+                "duree_previsionnelle": duree_previsionnelle,
+                "duree_actuelle": duree_actuelle,
+                "pourcentage_depassement": round(pourcentage_depassement, 2),
+                "statut": statut,
+                "statut_text": statut_text,
+                "forage_info": {
+                    "id_forage": forage.idForage,
+                    "zone": forage.zone,
+                    "date_debut": forage.dateDebut.strftime('%Y-%m-%d') if forage.dateDebut else None
+                }
+            }
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Forage.DoesNotExist:
+            return Response({"error": "Forage introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+class CostStatusView(APIView):
+    permission_classes = [AllowAny]  # Ajustez selon vos besoins d'authentification
+    
+    def get(self, request, id_forage, format=None):
+        try:
+            print("ID Forage reçu pour cost status:", id_forage)
+
+            # Récupère la phase la plus récente pour ce forage
+            latest_phase = Phase.objects.filter(idForage=id_forage).order_by('-dateDebut').first()
+            
+            if not latest_phase:
+                return Response(
+                    {"error": "Aucune phase trouvée pour ce forage."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Récupère la phase standard correspondante
+            phase_standard = latest_phase.idPhaseStandard
+            
+            if not phase_standard:
+                return Response(
+                    {"error": "Aucune phase standard associée à cette phase."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Calculs de comparaison basés sur les champs du modèle
+            cout_previsionnel_standard = phase_standard.coutPrevistionel
+            cout_cumulatif_actuel = latest_phase.coutCumulatifActuel
+            
+            # Calcul du pourcentage de dépassement
+            if cout_previsionnel_standard > 0:
+                pourcentage_depassement = ((cout_cumulatif_actuel - cout_previsionnel_standard) / cout_previsionnel_standard) * 100
+            else:
+                pourcentage_depassement = 0
+
+            # Détermination du statut couleur
+            # Vert: <= 10% de dépassement
+            # Orange: 10% < dépassement <= 25%  
+            # Rouge: > 25% de dépassement
+            
+            if pourcentage_depassement <= 10:
+                statut = "green"
+                statut_text = "Acceptable"
+            elif pourcentage_depassement <= 25:
+                statut = "orange"
+                statut_text = "Slight overage"
+            else:
+                statut = "red"
+                statut_text = "Significant overage"
+
+            # Préparation des segments pour le speedometer
+            # Segments basés sur le coût prévisionnel standard
+            segment_vert = cout_previsionnel_standard * 1.1  # +10%
+            segment_orange = cout_previsionnel_standard * 1.25  # +25%
+            max_value = cout_previsionnel_standard * 1.5   # +50% pour l'échelle max
+
+            data = {
+                "cout_previsionnel_standard": cout_previsionnel_standard,
+                "cout_cumulatif_actuel": cout_cumulatif_actuel,
+                "pourcentage_depassement": round(pourcentage_depassement, 2),
+                "statut": statut,
+                "statut_text": statut_text,
+                "segments": {
+                    "max_value": max_value,
+                    "segment_stops": [0, segment_vert, segment_orange, max_value],
+                    "current_value": cout_cumulatif_actuel
+                },
+                "phase_info": {
+                    "id_phase": latest_phase.idPhase,
+                    "nom_phase_standard": phase_standard.nomDePhase,
+                    "current_operation": latest_phase.currentOperation,
+                    "planned_operation": latest_phase.plannedOperation,
+                    "date_debut": latest_phase.dateDebut.strftime('%Y-%m-%d'),
+                    "depth_actuel": latest_phase.depthActuel,
+                    "delai_actuel": latest_phase.delaiActuel,
+                    "cout_actuel": latest_phase.coutActuel
+                }
+            }
+
+            print("Données cost status envoyées:", data)
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print("Erreur serveur cost status:", str(e))
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": "Une erreur interne est survenue"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+class DashboardForageView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request, id_forage, format=None):
+        try:
+            print("ID Forage reçu:", id_forage)
+
+            # ✅ Utilisez 'idForage' au lieu de 'idForage_id'
+            phases = Phase.objects.filter(idForage=id_forage).order_by('-dateDebut')
+
+            if not phases.exists():
+                return Response(
+                    {"message": "Aucune phase trouvée pour ce forage."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            latest_phase = phases.first()
+
+            data = {
+                "phase_actuelle": latest_phase.currentOperation,
+                "cout_cumulatif": latest_phase.coutCumulatifActuel,
+                "cout_actuel": latest_phase.coutActuel,
+                "nombre_de_jours": latest_phase.delaiActuel
+            }
+
+            print("Données envoyées:", data)
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print("Erreur serveur:", str(e))
+            return Response(
+                {"error": "Une erreur interne est survenue"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 class Rapport_importedView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
@@ -304,3 +582,4 @@ class PublicNotificationListView(APIView):
                 'status': 'error',
                 'message': 'Notification non trouvée'
             }, status=status.HTTP_404_NOT_FOUND)
+

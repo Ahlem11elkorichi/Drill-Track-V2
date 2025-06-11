@@ -12,8 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
-import oracledb
-oracledb.init_oracle_client(lib_dir=r"C:\Oracle\instantclient_23_7")
+
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -96,11 +95,11 @@ WSGI_APPLICATION = 'cs.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'drilltrackkk',
+        'NAME': 'drilltrack',
         'USER': 'postgres',
-        'PASSWORD': 'ahlem1234',
+        'PASSWORD': '1111',
         'HOST': 'localhost',     
-        'PORT': '5433',
+        'PORT': '5432',
     }
 }
 

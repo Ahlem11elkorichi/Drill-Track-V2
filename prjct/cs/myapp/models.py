@@ -60,8 +60,10 @@ class Forage(models.Model):
     description = models.TextField(blank=True, null=True)
     dateDebut = models.DateField(blank=True, null=True) 
     dateFin = models.DateField(blank=True, null=True)
-    dureePrevistionnelle = models.IntegerField(blank=True, null=True)
-   # dureeActuelle = models.IntegerField(blank=True, null=True) # wa9ila nahoha
+    dureePrevistionnelle = models.IntegerField(blank=True, null=True,default=70)
+    coutprevistionnel = models.FloatField(blank=True, null=True,default=11056000.0)
+    coutActuel = models.FloatField(blank=True, null=True,default=0)
+    durationActuelle = models.IntegerField(blank=True, null=True,default=0)
 
     def __str__(self):
         return f"Forage {self.idForage} - {self.zone}"
