@@ -48,7 +48,50 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Rapport, Forage
 from django.core.exceptions import ObjectDoesNotExist
+class LatestNotificationForageView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request, format=None):
+        """
+        API pour récupérer l'idForage de la dernière notification
+        """
+        try:
+            # Récupérer la dernière notification (ordonnée par created_at DESC)
+            latest_notification = Notification.objects.select_related(
+                'idRapport__idForage'
+            ).first()
+            
+            if not latest_notification:
+                return Response({
+                    "error": "Aucune notification trouvée."
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Extraire les informations
+            forage = latest_notification.idRapport.idForage
+            
+            data = {
+                "idForage": forage.idForage,
+                "notification_info": {
+                    "notification_id": latest_notification.idnotif,
+                    "rapport_number": latest_notification.idRapport.numRapport,
+                    "date_notification": latest_notification.dateNotif.strftime('%Y-%m-%d'),
+                    "analysed": latest_notification.analysed,
+                    "time_ago": latest_notification.time_ago
+                },
+                "forage_info": {
+                    "zone": forage.zone,
+                    "description": forage.description,
+                    "date_debut": forage.dateDebut.strftime('%Y-%m-%d') if forage.dateDebut else None,
+                    "date_fin": forage.dateFin.strftime('%Y-%m-%d') if forage.dateFin else None
+                }
+            }
+            
+            return Response(data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class DerniereRemarqueForageView(APIView):
     permission_classes = [AllowAny]
 
@@ -396,7 +439,6 @@ class DashboardForageView(APIView):
         try:
             print("ID Forage reçu:", id_forage)
 
-            # ✅ Utilisez 'idForage' au lieu de 'idForage_id'
             phases = Phase.objects.filter(idForage=id_forage).order_by('-dateDebut')
 
             if not phases.exists():
@@ -428,7 +470,6 @@ class Rapport_importedView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     
     def get(self, request):
-        # Utilisez select_related pour optimiser les requêtes
         fichiers = Rapport_imported.objects.all().select_related('user').order_by('-date_upload')
         serializer = Rapport_importedSerializer(fichiers, many=True)
         return Response(serializer.data)
@@ -562,18 +603,19 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 class NotificationListView(APIView):
-    permission_classes = [IsAuthenticated]
-    
+    #permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+
     def get(self, request):
         filter_type = request.query_params.get('filter', 'all')
-        
+    
         if filter_type == 'analysed':
             notifications = request.user.notifications.filter(analysed=True)
         elif filter_type == 'not_analysed':
             notifications = request.user.notifications.filter(analysed=False)
         else:
             notifications = request.user.notifications.all()
-        
+         
         # Group by forage info
         forage_groups = {}
         for notif in notifications.order_by('-created_at'):
@@ -617,8 +659,9 @@ class NotificationListView(APIView):
             return Response({"status": "error", "message": "Notification not found"}, status=404)
 
 class NotificationCountView(APIView):
-    permission_classes = [IsAuthenticated]
-    
+    #permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+
     def get(self, request):
         count = request.user.notifications.filter(analysed=False).count()
         return Response({"count": count})
@@ -687,3 +730,68 @@ class PublicNotificationListView(APIView):
                 'message': 'Notification non trouvée'
             }, status=status.HTTP_404_NOT_FOUND)
 
+class PublicNotificationListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        filter_type = request.query_params.get('filter', 'all')
+        last_update = request.query_params.get('last_update')
+        # Retournez seulement les nouvelles notifications si last_update est fourni
+        if last_update:
+            new_notifs = Notification.objects.filter(created_at__gt=last_update)
+            if not new_notifs.exists():
+                return Response(status=304)  # Not Modified
+        notifications = Notification.objects.select_related(
+            'idRapport', 
+            'idRapport__idForage'
+        ).all()
+        
+        if filter_type == 'analysed':
+            notifications = notifications.filter(analysed=True)
+        elif filter_type == 'not_analysed':
+            notifications = notifications.filter(analysed=False)
+        
+        results = []
+        for notif in notifications:
+            try:
+                # Gestion des valeurs nulles
+                forage_id = notif.idRapport.idForage.idForage if notif.idRapport and notif.idRapport.idForage else 0
+                rapport_num = notif.idRapport.numRapport if notif.idRapport else 0
+                phase = notif.idRapport.nom_phase if notif.idRapport else 0
+                zone = notif.idRapport.idForage.zone
+                
+                results.append({
+                    'id': notif.idnotif,
+                    'message': f"Rapport #{rapport_num}",
+                    'forage_info': f"Zone: {zone} | Phase: {phase}",
+                    'time_ago': notif.time_ago,
+                    'analysed': notif.analysed,
+                    'id_forage':forage_id
+                })
+            except Exception as e:
+                # Enregistrer l'erreur mais continuer le traitement
+                print(f"Error processing notification {notif.idnotif}: {str(e)}")
+                continue
+        
+        return Response({
+            'analysed_count': Notification.objects.filter(analysed=True).count(),
+            'not_analysed_count': Notification.objects.filter(analysed=False).count(),
+            'count': len(results),
+            'results': results
+        })
+    
+    def post(self, request):
+        notification_id = request.data.get('notification_id')
+        try:
+            notification = Notification.objects.get(idnotif=notification_id)
+            notification.analysed = True
+            notification.save()
+            return Response({
+                'status': 'success',
+                'message': 'Notification marquée comme analysée'
+            })
+        except Notification.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Notification non trouvée'
+            }, status=status.HTTP_404_NOT_FOUND)

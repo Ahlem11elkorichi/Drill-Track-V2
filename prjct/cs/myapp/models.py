@@ -133,7 +133,7 @@ class Phase(models.Model):
     coutCumulatifActuel = models.FloatField()
     currentOperation = models.CharField(default="operation X")
     plannedOperation=models.CharField(default="operation Y")
-    etat = models.CharField(max_length=20, choices=STATUS_CHOICES, default="in progress")
+    etat = models.CharField(max_length=20, choices=STATUS_CHOICES, default="inprogress")
 
     def __str__(self):
         return f"Phase {self.idPhase} - {self.idPhaseStandard} - {self.idForage} - {self.dateDebut} - {self.depthActuel} - {self.delaiActuel} - {self.coutActuel} - {self.coutCumulatifActuel} - {self.currentOperation} - {self.plannedOperation}"

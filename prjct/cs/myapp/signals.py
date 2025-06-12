@@ -68,24 +68,7 @@ def process_imported_rapport(sender, instance, created, **kwargs):
                 if last_forage:
                     last_forage.dateFin = date_rapport - timedelta(days=1)
                     last_forage.save()
-                    last_phase=Phase.objects.filter(idForage=last_forage).order_by('idPhase').last()
-                    if last_phase:
-                        last_phase.dateFin = date_rapport - timedelta(days=1)
-                        phase_standard = last_phase.idPhaseStandard
-                        delai_previsionnel = phase_standard.delaiPrevistionel
-                        delai_actuel = last_phase.delaiActuel
-                        if delai_previsionnel > 0:
-                            pourcentage_depassement = ((delai_actuel - delai_previsionnel) / delai_previsionnel) * 100
-                        else:
-                            pourcentage_depassement = 0
-              
-                        if pourcentage_depassement <= 10:
-                           last_phase.etat="on time"
-                        elif pourcentage_depassement <= 25:
-                           last_phase.etat = "slight delay"
-                        else:
-                           last_phase.etat = "significant delay"
-                        last_phase.save()
+                    
                 
                 forage = Forage.objects.create(
                     zone=zone,
@@ -123,8 +106,27 @@ def process_imported_rapport(sender, instance, created, **kwargs):
                 else:
                     # Create new phase for existing forage
                     try:
-                        phase_std = PhaseStandard.objects.get(nomDePhase__startswith=normalize(rapport.nom_phase[0:2]))
-                        Phase.objects.create(
+                         last_p = Phase.objects.filter(idForage=forage).order_by('idPhase').last()
+                         if last_p:
+                             phase_standard = last_p.idPhaseStandard
+                             delai_previsionnel = phase_standard.delaiPrevistionel
+                             delai_actuel = last_p.delaiActuel
+                             if delai_previsionnel > 0:
+                               pourcentage_depassement = ((delai_actuel - delai_previsionnel) / delai_previsionnel) * 100
+                             else:
+                               pourcentage_depassement = 0
+              
+                             if pourcentage_depassement <= 10:
+                                last_p.etat="on time"
+                             elif pourcentage_depassement <= 25:
+                                last_p.etat = "slight delay"
+                             else:
+                                last_p.etat = "significant delay"
+                             last_p.save()
+
+                        
+                         phase_std = PhaseStandard.objects.get(nomDePhase__startswith=normalize(rapport.nom_phase[0:2]))
+                         Phase.objects.create(
                             idPhaseStandard=phase_std,
                             idForage=forage,
                             delaiActuel=1,
