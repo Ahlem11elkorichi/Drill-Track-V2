@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Rapport_imported, Notification, Rapport, User, Forage, Phase, PhaseStandard
+from .models import  Notification, Rapport, RapportImported, User, Forage, Phase, PhaseStandard
 from django.utils import timezone
 from django.db.models import Max
 import pandas as pd
@@ -14,7 +14,7 @@ def normalize(s):
         return ""
     return re.sub(r"[\"'\s]", "", str(s)).lower()
 
-@receiver(post_save, sender=Rapport_imported)
+@receiver(post_save, sender=RapportImported)
 def process_imported_rapport(sender, instance, created, **kwargs):
     """
     Signal handler that automatically processes imported reports and creates notifications.
@@ -61,56 +61,56 @@ def process_imported_rapport(sender, instance, created, **kwargs):
             planned_operation = df.iat[56, 14]
             
             # Find or create Forage
-            forage = Forage.objects.filter(zone=zone).order_by('dateDebut').last()
+            forage = Forage.objects.filter(zone=zone).order_by('date_debut').last()
             if forage is None:
                 # Handle case when forage doesn't exist
                 last_forage = Forage.objects.last()
                 if last_forage:
-                    last_forage.dateFin = date_rapport - timedelta(days=1)
+                    last_forage.date_fin = date_rapport - timedelta(days=1)
                     last_forage.save()
                     
                 
                 forage = Forage.objects.create(
                     zone=zone,
                     description="description",
-                    dateDebut=date_rapport,
-                    dateFin=date_rapport + timedelta(days=70),
-                    coutActuel=+cout_actuel,
-                    durationActuelle=+1,
+                    date_debut=date_rapport,
+                    date_fin=date_rapport + timedelta(days=70),
+                    cout_actuel=+cout_actuel,
+                    duration_actuelle=+1,
                 )
             
             # Create Rapport
             rapport = Rapport.objects.create(
-                idForage=forage,
-                numRapport=numrap,
-                dateActuelle=date_rapport,
+                id_forage=forage,
+                num_rapport=numrap,
+                date_actuelle=date_rapport,
                 nom_phase=phase_actuelle,
                 id_rapport_imported=instance  # Link to the imported rapport
             )
             
             # Now handle Phase creation/update
-            last_rapport = Rapport.objects.filter(idForage=forage).order_by('dateActuelle').last()
-            last_phase = Phase.objects.filter(idForage=forage).order_by('idPhase').last()
+            last_rapport = Rapport.objects.filter(id_forage=forage).order_by('date_actuelle').last()
+            last_phase = Phase.objects.filter(id_forage=forage).order_by('id_phase').last()
             
             if last_rapport is not None and last_phase is not None:
-                if normalize(last_rapport.nom_phase) in normalize(last_phase.idPhaseStandard.nomDePhase):
+                if normalize(last_rapport.nom_phase) in normalize(last_phase.id_phase_standard.nom_de_phase):
                     # Update existing phase
-                    last_phase.delaiActuel = (rapport.dateActuelle - last_phase.dateDebut).days
-                    last_phase.coutActuel = cout_actuel
-                    last_phase.depthActuel = depth
-                    last_phase.coutCumulatifActuel = coutCumul_actuel
-                    last_phase.currentOperation = current_operation
-                    last_phase.plannedOperation = planned_operation
+                    last_phase.delai_actuel = (rapport.date_actuelle - last_phase.date_debut).days
+                    last_phase.cout_actuel = cout_actuel
+                    last_phase.depth_actuel = depth
+                    last_phase.cout_cumulatif_actuel = coutCumul_actuel
+                    last_phase.current_operation = current_operation
+                    last_phase.planned_operation = planned_operation
                     last_phase.etat="on progress"
                     last_phase.save()
                 else:
                     # Create new phase for existing forage
                     try:
-                         last_p = Phase.objects.filter(idForage=forage).order_by('idPhase').last()
+                         last_p = Phase.objects.filter(id_forage=forage).order_by('id_phase').last()
                          if last_p:
-                             phase_standard = last_p.idPhaseStandard
-                             delai_previsionnel = phase_standard.delaiPrevistionel
-                             delai_actuel = last_p.delaiActuel
+                             phase_standard = last_p.id_phase_standard
+                             delai_previsionnel = phase_standard.delai_previstionel
+                             delai_actuel = last_p.delai_actuel
                              if delai_previsionnel > 0:
                                pourcentage_depassement = ((delai_actuel - delai_previsionnel) / delai_previsionnel) * 100
                              else:
@@ -125,14 +125,14 @@ def process_imported_rapport(sender, instance, created, **kwargs):
                              last_p.save()
 
                         
-                         phase_std = PhaseStandard.objects.get(nomDePhase__startswith=normalize(rapport.nom_phase[0:2]))
+                         phase_std = PhaseStandard.objects.get(nom_de_phase__startswith=normalize(rapport.nom_phase[0:2]))
                          Phase.objects.create(
-                            idPhaseStandard=phase_std,
-                            idForage=forage,
+                            id_phase_standard=phase_std,
+                            id_forage=forage,
                             delaiActuel=1,
                             depthActuel=depth,
-                            dateDebut=date_rapport,
-                            coutActuel=cout_actuel,
+                            date_debut=date_rapport,
+                            cout_actuel=cout_actuel,
                             coutCumulatifActuel=coutCumul_actuel,
                             currentOperation=current_operation,
                             plannedOperation=planned_operation
@@ -142,13 +142,13 @@ def process_imported_rapport(sender, instance, created, **kwargs):
             else:
                 # Create new phase for new forage
                 try:
-                    phase_std = PhaseStandard.objects.get(nomDePhase__startswith=phase_actuelle[0:2])
+                    phase_std = PhaseStandard.objects.get(nom_de_phase__startswith=phase_actuelle[0:2])
                     Phase.objects.create(
-                        idPhaseStandard=phase_std,
-                        idForage=forage,
+                        id_phase_standard=phase_std,
+                        id_forage=forage,
                         delaiActuel=1,
-                        coutActuel=cout_actuel,
-                        dateDebut=date_rapport,
+                        cout_actuel=cout_actuel,
+                        date_debut=date_rapport,
                         depthActuel=depth,
                         coutCumulatifActuel=coutCumul_actuel,
                         currentOperation=current_operation,
@@ -162,9 +162,9 @@ def process_imported_rapport(sender, instance, created, **kwargs):
             responsables = User.objects.filter(role='responsable')
             for user in responsables:
                 Notification.objects.create(
-                    iduser=user,
-                    idRapport=rapport,
-                    dateNotif=timezone.now().date(),
+                    id_user=user,
+                    id_rapport=rapport,
+                    date_notif=timezone.now().date(),
                     analysed=False
                     # 'message' field removed as it's not in your model
                 )

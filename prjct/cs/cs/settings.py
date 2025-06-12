@@ -94,12 +94,10 @@ WSGI_APPLICATION = 'cs.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'drilltrack',
-        'USER': 'postgres',
-        'PASSWORD': '1111',
-        'HOST': 'localhost',     
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.oracle',
+        'NAME': '127.0.0.1:1521/FREEPDB1',  # ou votre nom de service Oracle
+        'USER': 'ahlem',
+        'PASSWORD': 'ahlem123',
     }
 }
 
