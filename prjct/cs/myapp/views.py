@@ -43,6 +43,110 @@ from rest_framework.decorators import api_view
 
 from .models import Phase, Forage
 from django.db.models import Max
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Rapport, Forage
+from django.core.exceptions import ObjectDoesNotExist
+
+class DerniereRemarqueForageView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id_forage, format=None):
+        try:
+            forage = Forage.objects.get(idForage=id_forage)
+
+            dernier_rapport = (
+                Rapport.objects
+                .filter(idForage=forage, id_rapport_imported__isnull=False)
+                .select_related('id_rapport_imported')
+                .order_by('-id_rapport_imported__date_upload')  # le plus récent
+                .first()
+            )
+
+            if dernier_rapport and dernier_rapport.id_rapport_imported:
+                rapport_imported = dernier_rapport.id_rapport_imported
+                remarque = {
+                    "titre": rapport_imported.title,
+                    "priorite": rapport_imported.priority_remarque,
+                    "observation": rapport_imported.observation_remarque,
+                    "solution": rapport_imported.solution_remarque,
+                    "date_upload": rapport_imported.date_upload.strftime('%Y-%m-%d')
+                }
+                return Response({"forage_id": forage.idForage, "remarque": remarque}, status=status.HTTP_200_OK)
+
+            return Response({"message": "Aucune remarque disponible pour ce forage."}, status=status.HTTP_204_NO_CONTENT)
+
+        except Forage.DoesNotExist:
+            return Response({"error": "Forage non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print("Erreur lors de la récupération de la remarque :", str(e))
+            return Response({"error": "Erreur serveur."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# avec les inormations de l'utilisateurs 
+# class DerniereRemarqueForageView(APIView):
+#     def get(self, request, id_forage, format=None):
+#         try:
+#             forage = Forage.objects.get(idForage=id_forage)
+
+#             dernier_rapport = (
+#                 Rapport.objects
+#                 .filter(idForage=forage, id_rapport_imported__isnull=False)
+#                 .select_related('id_rapport_imported', 'id_rapport_imported__user')
+#                 .order_by('-id_rapport_imported__date_upload')  # Tri décroissant par date
+#                 .first()
+#             )
+
+#             if dernier_rapport and dernier_rapport.id_rapport_imported:
+#                 rapport_imported = dernier_rapport.id_rapport_imported
+#                 remarque = {
+#                     "titre": rapport_imported.title,
+#                     "priorite": rapport_imported.priority_remarque,
+#                     "observation": rapport_imported.observation_remarque,
+#                     "solution": rapport_imported.solution_remarque,
+#                     "date_upload": rapport_imported.date_upload.strftime('%Y-%m-%d'),
+#                     "utilisateur": rapport_imported.user.first_name+ " " + rapport_imported.user.last_name if rapport_imported.user else "Inconnu"  
+#                 }
+#                 return Response({"forage_id": forage.idForage, "remarque": remarque}, status=status.HTTP_200_OK)
+
+#             return Response({"message": "Aucune remarque disponible pour ce forage."}, status=status.HTTP_204_NO_CONTENT)
+
+#         except Forage.DoesNotExist:
+#             return Response({"error": "Forage non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+#         except Exception as e:
+#             print("Erreur lors de la récupération de la remarque :", str(e))
+#             return Response({"error": "Erreur serveur."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+class ForagePhaseStatusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, id_forage, format=None):
+        try:
+            forage = Forage.objects.get(idForage=id_forage)
+            phases = Phase.objects.filter(idForage=forage)
+
+            phase_list = []
+            for phase in phases:
+                phase_list.append({
+                    "id_phase": phase.idPhase,
+                    "nom_phase": phase.idPhaseStandard.nomDePhase if phase.idPhaseStandard else "Inconnu",
+                    "etat": phase.etat,
+                    "delai":phase.delaiActuel,
+                    "depth":phase.depthActuel
+                })
+
+            data = {
+                "id_forage": forage.idForage,
+                "zone": forage.zone,
+                "phases": phase_list
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Forage.DoesNotExist:
+            return Response({"error": "Forage non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print("Erreur serveur forage phase status:", str(e))
+            return Response({"error": "Une erreur interne est survenue"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class ForageCostStatusView(APIView):
     permission_classes = [AllowAny]
 
@@ -336,7 +440,7 @@ class Rapport_importedView(APIView):
             
             data = {
                 'url': request.FILES.get('url'),
-                'priority_remarque': request.data.get('priority_remarque', Priority.MOYENNE.value),
+                'priority_remarque': request.data.get('priority_remarque', Priority.MEDIUM.value),
                 'title': request.data.get('title', ''),
                 'user': request.data.get('user'),
                 'observation_remarque': request.data.get('observation_remarque', ''),

@@ -68,11 +68,13 @@ class Forage(models.Model):
     def __str__(self):
         return f"Forage {self.idForage} - {self.zone}"
     
-from enum import Enum
+
+from enum import Enum    
 class Priority(Enum):
-    HAUTE = "HAUTE"
-    MOYENNE = "MOYENNE"
-    FAIBLE = "FAIBLE"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
 
     @classmethod
     def choices(cls):
@@ -84,7 +86,7 @@ class Rapport_imported(models.Model):
     url=models.FileField()
     date_upload=models.DateField(auto_now_add=True)
     title=models.CharField(max_length=500)
-    priority_remarque=models.CharField(max_length=20,choices=Priority.choices(),default=Priority.MOYENNE.value)
+    priority_remarque=models.CharField(max_length=20,choices=Priority.choices(),default=Priority.MEDIUM.value)
     observation_remarque=models.CharField(max_length=500)
     solution_remarque=models.CharField(max_length=800)
     def __str__(self):
@@ -115,6 +117,12 @@ class PhaseStandard(models.Model):
 
 
 class Phase(models.Model):
+    STATUS_CHOICES = [
+        ("on time", "On Time"),
+        ("slightly ahead", "Slightly Ahead"),
+        ("delayed", "Delayed"),
+        ("inprogress", "In Progress"),
+    ]
     idPhase = models.AutoField(primary_key=True)
     idPhaseStandard = models.ForeignKey(PhaseStandard, on_delete=models.SET_NULL, null=True)
     idForage = models.ForeignKey(Forage, on_delete=models.CASCADE)
@@ -125,15 +133,18 @@ class Phase(models.Model):
     coutCumulatifActuel = models.FloatField()
     currentOperation = models.CharField(default="operation X")
     plannedOperation=models.CharField(default="operation Y")
+    etat = models.CharField(max_length=20, choices=STATUS_CHOICES, default="in progress")
 
     def __str__(self):
         return f"Phase {self.idPhase} - {self.idPhaseStandard} - {self.idForage} - {self.dateDebut} - {self.depthActuel} - {self.delaiActuel} - {self.coutActuel} - {self.coutCumulatifActuel} - {self.currentOperation} - {self.plannedOperation}"
     
+
 from enum import Enum
 class Priority(Enum):
-    HAUTE = "HAUTE"
-    MOYENNE = "MOYENNE"
-    FAIBLE = "FAIBLE"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
 
     @classmethod
     def choices(cls):

@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import NotificationCountView, NotificationListView, PublicNotificationListView, RegisterView, LoginView, UserDetailView , DashboardForageView, CostStatusView,PhaseDelayStatusView, ForageDelayStatusView, ForageCostStatusView
+from .views import NotificationCountView, NotificationListView, PublicNotificationListView, RegisterView, LoginView, UserDetailView , DashboardForageView, CostStatusView,PhaseDelayStatusView, ForageDelayStatusView, ForageCostStatusView, ForagePhaseStatusView, DerniereRemarqueForageView
 from .views import  FichierExcelFilteredView,  Rapport_importedListCreateView, Rapport_importedView, LoginView, RapportView, RegisterView, UserDetailView
 # Create a router for viewsets
 router = DefaultRouter()
@@ -9,6 +9,8 @@ router = DefaultRouter()
 
 urlpatterns = [
     # urls.py - Ajoutez cette ligne
+    path('api/forage/<int:id_forage>/remarque/', DerniereRemarqueForageView.as_view(), name='derniere-remarque-pour-forage'),
+    path('api/forage/<int:id_forage>/phases/', ForagePhaseStatusView.as_view(), name='forage-phase-status'),
     path('api/dashboard/phase-delay/<int:id_forage>/', PhaseDelayStatusView.as_view(), name='phase-delay-status'),
     path('api/dashboard/forage-delay/<int:id_forage>/', ForageDelayStatusView.as_view(), name='forage-delay-status'),
     path('api/dashboard/forage-cost/<int:id_forage>/', ForageCostStatusView.as_view(), name='forage-cost-status'),
