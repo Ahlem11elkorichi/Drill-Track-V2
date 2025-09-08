@@ -19,7 +19,7 @@ The project follows a modular architecture:
 
 - **Frontend**: React + TailwindCSS  
 - **Backend**: Django REST Framework  
-- **Database**: MySQL  
+- **Database**: oracle 
 
 ---
 
@@ -27,7 +27,7 @@ The project follows a modular architecture:
 - React  
 - TailwindCSS  
 - Django REST Framework  
-- MySQL    
+- oracle db    
 
 ---
 
